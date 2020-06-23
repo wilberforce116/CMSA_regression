@@ -1,0 +1,174 @@
+---
+title: "Predicting Goal Differential in Women's Soccer"
+author: "Caleb Pena and Lucy Ward"
+output: html_notebook
+---
+
+
+# Introduction to the dataset
+## The variables
+
+**Generic team information**
+
+- team: team name
+- team_games: number of games played
+- team_min: total minutes played including stoppage time
+
+**Win-Loss information**
+
+- won: games won
+- lost: games lost
+- tied: games tied
+- win_pct: winning percentage (wins + 0.5* ties/ # games played)
+
+**Goals scored and contributing factors**
+
+- **goals**: total goals scored by team
+- gpg: the number of goals scored by the team per game played
+- **assists**: the total number of assists earned by players on the team
+- assists_gp: total assists earned per game played
+- **ps**: penalty kicks scored on
+- psatt: penalty kicks attempted
+- pk_pct: percentage of penalty kicks scored on
+- **corners**: corner kicks taken (unavailable for 2018)
+- corners_gp: corner kicks taken per game played (unavailable for 2018)
+- **sog**: total shots on goal
+- shatt: total shot attempts
+- sog_pct: percentage of shot attempts that were on goal
+- sog_gp: number of shots on goal per game played
+
+**Goal prevention and contributing factors**
+
+- **ga**: goals against
+- gaa: goals against per game played
+- **saves**: saves made by team goalkeepers
+- save_pct: percentage of shots faced that goalkeepers saved
+- saves_gp: number of saves made per game played
+
+**Miscellaneous**
+
+- **points**: total points (2*goals + assists) accumulated for all players on the team
+- points_gp: points accumulated by players on the team per game played
+- **fouls**: total fouls called on the team.
+- fouls_gp: fouls called on the team per game played
+
+
+
+# Choosing a response variable
+
+- Research goal: Identify which skills contribute most to team success and quantify their impact.
+- Instead of using **win_pct** as our metric of team success we created a new variable, **goal_diff**, defined as goals scored minus goals allowed. The two metrics are very similar as shown in the graph below. We can think of **goal_diff** as a rough way of adjusting for luck. In addition, fitting a linear model for **win_pct** produces coefficients that are very small and somewhat more difficult to interpret (recall that the response is already bound between 0 and 1).
+
+```{r, message= F, warning = F}
+soccer_data <- read_csv("womens_ncaa_soccer_20182019.csv")[,-c(1,2)] %>% 
+  mutate(goal_diff = goals - ga)
+soccer_data$season <- as_factor(soccer_data$season)
+
+soccer_data %>% 
+  ggplot(aes(goal_diff, win_pct)) +
+  geom_point(col = "#4D4D4D", alpha = 0.85) +
+  geom_smooth(method = "lm", se = F, col = "#CC002B") +
+  xlab("Goal Differential") +
+  ylab("Winning Percentage") +
+  labs(title = "A Comparison of Two Potential Responses") +
+  theme_bw()
+
+cor(soccer_data$goal_diff, soccer_data$win_pct)
+
+```
+
+
+# Choosing predictors
+
+- Note 1: A model fit with just goals and goals allowed as predictors would be the perfect (if trivial) model. But since our goal is to understand the factors that influence the net number of goals, we will omit them. Similarly, we will omit variables that are functions of goals and goals allowed (goals_pg, points, etc.).
+- Note 2: We prefer rate variables (per game or percentages) to raw numbers.
+- Note 3: Goal Differential has a positive relationship with both minutes played and number of games played but these relationships are not very meaningful for our purposes. For one, a team that performs better is more likely to make the playoffs allowing them to accrue more games and minutes. This in turn give them more opportunities to score goals inflating their goal differential.
+
+```{r}
+soccer_data %>% 
+  ggplot(aes(team_games, goal_diff)) +
+  geom_point(col = "#4D4D4D", alpha = 0.7) +
+  xlab("Number of Games Played") +
+  ylab("Goal Differential") +
+  labs(title = "Relationship between Number of Games and Goal Differential") +
+  theme_bw()
+
+soccer_data %>% 
+  ggplot(aes(team_min, goal_diff)) +
+  geom_point(col = "#4D4D4D", alpha = 0.7) +
+  xlab("Total Minutes Played") +
+  ylab("Goal Differential") +
+  labs(title = "Relationship between Minutes and Goal Differential") +
+  theme_bw()
+
+```
+
+
+- This leaves us with a much smaller pool of variables to choose from:
+  - assists_gp
+  - pk_pct
+  - corners_gp
+  - sog_gp
+  - sog_pct
+  - save_pct
+  - saves_pg
+  - fouls_gp
+
+```{r}
+soccer_data %>% 
+  filter(!is.na(corners_gp)) %>% 
+  select(goal_diff, assists_gp, pk_pct, corners_gp, sog_gp, sog_pct, saves_gp, save_pct, fouls_gp) %>% 
+  cor()
+```
+
+Note that both **saves_gp** and **save_pct** are correlated with **goal_diff** but in opposite directions. **sog_pct** has barely and linear correlation with **goal_diff** at all.
+
+```{r}
+# Plot sog_pct against goal_diff to check if a non-linear relationship exists
+```
+
+
+- Using complete linkage, we can cluster the variables to uncover relationships between them. The associated dendogram is displayed below. Some takeaways:
+  - The fouls variables and the penalty kick variables merge late and are unlikely to be predictive.
+  - Goals Against merges fairly quickly with Save % but only much later with Saves Per Game.
+
+```{r}
+soccer_cor <- soccer_data %>% 
+  na.omit() %>% 
+  mutate(goal_diff = goals - ga) %>% 
+  select_if(is.numeric) %>% 
+  cor()
+
+soccer_dist <- 1 - abs(soccer_cor)
+
+soccer_dist %>% 
+  as.dist() %>% 
+  hclust(method = "complete") %>% 
+  as.dendrogram() %>% 
+  ggdendro::ggdendrogram(rotate = T) + 
+  labs(title = "How Complete Linkage Groups the Features")
+
+```
+
+
+Using subject matter knowledge has allowed us to narrow our pool of potential variables. We can use cross-validation to identify the best subgroups of these variables
+
+```{r}
+
+```
+
+# Model evaluation
+## Check diagnostic plots
+
+```{r}
+
+```
+
+
+# Model Results
+## Plot, interpret, and compare coefficients for our candidate models
+
+
+
+
+
